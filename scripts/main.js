@@ -128,7 +128,7 @@ function updateFrequencyRange(radio) {
     // Set default frequency for the band
     const defaultFreqs = {
         '433': 433.92,
-        '868': 868.5,
+        '868': 869.5,
         '915': 915.0
     };
     
