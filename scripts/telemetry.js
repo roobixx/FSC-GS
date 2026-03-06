@@ -26,8 +26,14 @@ function unpackCommand(data) {
             case 'EULR':
                 unpackSensorData(identifier, data);
                 break;
-            case 'BMED':
+            case 'BME2':
                 unpackBMEData(data);
+                break;
+            case 'TEMP':
+                unpackTempData(data);
+                break;
+            case 'QUAT':
+                unpackQuaternionData(data);
                 break;
             case 'POLL':
                 unpackPollData(data);
@@ -57,6 +63,15 @@ function unpackCommand(data) {
                 break;
             case 'RETX':
                 unpackRetransmitData(data);
+                break;
+            case 'XFRC':
+                unpackTransferComplete(data);
+                break;
+            case 'BECN':
+                unpackBeacon(data);
+                break;
+            case 'PHOT':
+                unpackPhotoResponse(data);
                 break;
             default:
                 // Unknown identifier - log for debugging if needed
@@ -142,6 +157,48 @@ function unpackBMEData(data) {
 }
 
 /**
+ * Unpack temperature sensor data
+ * Packet format: [4-byte ID][4-byte int temperature]
+ * @param {Uint8Array} data - 8-byte TEMP packet
+ */
+function unpackTempData(data) {
+    if (data.length < 8) {
+        logToTerminal(`Invalid TEMP packet size: ${data.length} bytes`, 'warning');
+        return;
+    }
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const temp = view.getInt32(4, true);
+
+    logToTerminal(`Temperature: ${temp}°C`, 'response');
+
+    const tempElement = document.getElementById('temperature');
+    if (tempElement) {
+        tempElement.textContent = `${temp}°C`;
+    }
+}
+
+/**
+ * Unpack quaternion orientation data
+ * Packet format: [4-byte ID][4 × 4-byte float (w, x, y, z)]
+ * @param {Uint8Array} data - 20-byte QUAT packet
+ */
+function unpackQuaternionData(data) {
+    if (data.length < 20) {
+        logToTerminal(`Invalid QUAT packet size: ${data.length} bytes`, 'warning');
+        return;
+    }
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const w = view.getFloat32(4, true);
+    const x = view.getFloat32(8, true);
+    const y = view.getFloat32(12, true);
+    const z = view.getFloat32(16, true);
+
+    logToTerminal(`Quaternion - W: ${w.toFixed(4)}, X: ${x.toFixed(4)}, Y: ${y.toFixed(4)}, Z: ${z.toFixed(4)}`, 'response');
+}
+
+/**
  * Unpack environmental polling data (variable length)
  * Packet format: [4-byte ID][4-byte payload_length][payload data]
  * @param {Uint8Array} data - Variable length poll packet
@@ -218,6 +275,11 @@ function unpackOBCSingleValue(identifier, data) {
         const diskElement = document.getElementById('diskUsage');
         if (diskElement) {
             diskElement.textContent = `${value.toFixed(0)}%`;
+        }
+    } else if (identifier === 'OBCC') {
+        const cpuElement = document.getElementById('cpuUsage');
+        if (cpuElement) {
+            cpuElement.textContent = `${value.toFixed(0)}%`;
         }
     }
 }
@@ -296,25 +358,36 @@ function unpackADCSData(data) {
     }
 
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    logToTerminal('Satellite Orientation (ADCS):', 'response');
-    
-    let orientationValues = [];
-    for (let i = 0; i < 7; i++) {
-        const value = view.getFloat32(4 + i * 4, true);
-        orientationValues.push(value);
-        logToTerminal(`  Value ${i + 1}: ${value.toFixed(6)}`, 'response');
-    }
 
-    // Assuming the first 3 values are Euler angles (roll, pitch, yaw) in degrees
-    if (orientationValues.length >= 3) {
-        const roll = orientationValues[0];
-        const pitch = orientationValues[1];
-        const yaw = orientationValues[2];
-        
-        // Update 3D visualization if available
-        if (typeof updateSatelliteOrientation === 'function') {
-            updateSatelliteOrientation(roll, pitch, yaw);
-        }
+    // BNO055 orientation data: 3 Euler angles + 4 quaternion values
+    const heading = view.getFloat32(4, true);
+    const roll = view.getFloat32(8, true);
+    const pitch = view.getFloat32(12, true);
+    const quatW = view.getFloat32(16, true);
+    const quatX = view.getFloat32(20, true);
+    const quatY = view.getFloat32(24, true);
+    const quatZ = view.getFloat32(28, true);
+
+    logToTerminal('Satellite Orientation (ADCS):', 'response');
+    logToTerminal(`  Heading: ${heading.toFixed(2)}°`, 'response');
+    logToTerminal(`  Roll:    ${roll.toFixed(2)}°`, 'response');
+    logToTerminal(`  Pitch:   ${pitch.toFixed(2)}°`, 'response');
+    logToTerminal(`  Quat W:  ${quatW.toFixed(4)}`, 'response');
+    logToTerminal(`  Quat X:  ${quatX.toFixed(4)}`, 'response');
+    logToTerminal(`  Quat Y:  ${quatY.toFixed(4)}`, 'response');
+    logToTerminal(`  Quat Z:  ${quatZ.toFixed(4)}`, 'response');
+
+    // Update orientation display
+    const rollEl = document.getElementById('rollValue');
+    const pitchEl = document.getElementById('pitchValue');
+    const yawEl = document.getElementById('yawValue');
+    if (rollEl) rollEl.textContent = `${roll.toFixed(1)}°`;
+    if (pitchEl) pitchEl.textContent = `${pitch.toFixed(1)}°`;
+    if (yawEl) yawEl.textContent = `${heading.toFixed(1)}°`;
+
+    // Update 3D visualization if available
+    if (typeof updateSatelliteOrientation === 'function') {
+        updateSatelliteOrientation(roll, pitch, heading);
     }
 }
 
@@ -351,9 +424,19 @@ function unpackEPSStatus(data) {
 
     // Update telemetry display
     const batteryElement = document.getElementById('batteryVoltage');
-    if (batteryElement) {
-        batteryElement.textContent = `${batteryVoltage.toFixed(1)}V`;
-    }
+    if (batteryElement) batteryElement.textContent = `${batteryVoltage.toFixed(1)}V`;
+
+    const epsStatusEl = document.getElementById('epsStatus');
+    if (epsStatusEl) epsStatusEl.textContent = epsError === 0 ? 'OK' : `E${epsError}`;
+
+    const ch1El = document.getElementById('epsCh1');
+    if (ch1El) { ch1El.textContent = ch1State ? 'ON' : 'OFF'; ch1El.style.color = ch1State ? 'var(--accent-primary)' : 'var(--text-secondary)'; }
+    const ch2El = document.getElementById('epsCh2');
+    if (ch2El) { ch2El.textContent = ch2State ? 'ON' : 'OFF'; ch2El.style.color = ch2State ? 'var(--accent-primary)' : 'var(--text-secondary)'; }
+    const ch3El = document.getElementById('epsCh3');
+    if (ch3El) { ch3El.textContent = ch3State ? 'ON' : 'OFF'; ch3El.style.color = ch3State ? 'var(--accent-primary)' : 'var(--text-secondary)'; }
+    const ch4El = document.getElementById('epsCh4');
+    if (ch4El) { ch4El.textContent = ch4State ? 'ON' : 'OFF'; ch4El.style.color = ch4State ? 'var(--accent-primary)' : 'var(--text-secondary)'; }
 }
 
 // ============================================================================
@@ -374,19 +457,26 @@ function unpackSolarData(data) {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     logToTerminal('Solar Panel Telemetry:', 'response');
     
-    const panels = ['X-', 'X+', 'Y-', 'Y+'];
+    const panels = ['X-', 'X+', 'Y+', 'Y-'];
+    const panelIds = ['solarXn', 'solarXp', 'solarYp', 'solarYn'];
     let totalPower = 0;
-    
+
     for (let i = 0; i < 4; i++) {
         const voltage = view.getFloat32(4 + i * 8, true);
         const current = view.getFloat32(8 + i * 8, true);
         const power = voltage * current / 1000; // Convert mA to A for power calc
         totalPower += power;
-        
+
         logToTerminal(`  Panel ${panels[i]}: ${voltage.toFixed(2)}V, ${current.toFixed(2)}mA (${power.toFixed(3)}W)`, 'response');
+
+        const panelEl = document.getElementById(panelIds[i]);
+        if (panelEl) panelEl.textContent = `${voltage.toFixed(1)}V ${current.toFixed(0)}mA`;
     }
-    
+
     logToTerminal(`  Total Power: ${totalPower.toFixed(3)}W`, 'response');
+
+    const totalEl = document.getElementById('solarTotal');
+    if (totalEl) totalEl.textContent = `${totalPower.toFixed(2)}W`;
 }
 
 // ============================================================================
@@ -438,7 +528,9 @@ function getPacketTypeName(identifier) {
         'MAGN': 'Magnetometer',
         'GRAV': 'Gravity Vector',
         'EULR': 'Euler Angles',
-        'BMED': 'BME280 Environment',
+        'BME2': 'BME280 Environment',
+        'TEMP': 'Temperature',
+        'QUAT': 'Quaternion',
         'POLL': 'Environmental Poll',
         'OBCR': 'OBC RAM Usage',
         'OBCD': 'OBC Disk Usage', 
@@ -479,6 +571,122 @@ function validatePacket(data, expectedSize) {
     }
     
     return true;
+}
+
+// ============================================================================
+// Photo Response
+// ============================================================================
+
+/**
+ * Unpack photo capture response
+ * Packet format: [4-byte ID][4-byte length][filename string]
+ * @param {Uint8Array} data - Variable length PHOT packet
+ */
+function unpackPhotoResponse(data) {
+    if (data.length < 8) {
+        logToTerminal(`Invalid PHOT packet size: ${data.length} bytes`, 'warning');
+        return;
+    }
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const filenameLength = view.getUint32(4, true);
+    const filename = new TextDecoder().decode(data.slice(8, 8 + filenameLength)).replace(/\0/g, '').trim();
+
+    logToTerminal(`Photo captured: ${filename}`, 'response');
+}
+
+// ============================================================================
+// Transfer Complete
+// ============================================================================
+
+/**
+ * Unpack XFRC (transfer complete) marker and check for missing packets
+ * Packet format: [4-byte ID][4-byte total_packets]
+ * @param {Uint8Array} data - 8-byte XFRC packet
+ */
+function unpackTransferComplete(data) {
+    if (data.length < 8) {
+        logToTerminal(`Invalid XFRC packet size: ${data.length} bytes`, 'warning');
+        return;
+    }
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const totalPkts = view.getUint32(4, true);
+
+    logToTerminal(`Transfer complete signal: ${totalPkts} packets expected`, 'response');
+
+    // Check all active image receptions for missing packets
+    for (const [imageId, imageInfo] of imageReceptions.entries()) {
+        if (imageInfo.totalChunks === totalPkts) {
+            const received = imageInfo.receivedChunks.size;
+            const missing = totalPkts - received;
+
+            if (missing === 0) {
+                logToTerminal(`Image ${imageId}: all ${totalPkts} packets received!`, 'response');
+            } else {
+                const pct = (received / totalPkts * 100).toFixed(1);
+                logToTerminal(`Image ${imageId}: ${received}/${totalPkts} received (${pct}%), ${missing} missing`, 'warning');
+
+                // Show missing packet numbers for retransmission
+                const missingPkts = checkMissingPackets(imageId);
+                if (missingPkts.length <= 30) {
+                    logToTerminal(`Missing packets: ${missingPkts.join(', ')}`, 'info');
+                } else {
+                    logToTerminal(`Missing packets: ${missingPkts.slice(0, 30).join(', ')}... (+${missingPkts.length - 30} more)`, 'info');
+                }
+
+                const filename = imageInfo.filename || `image.jpg.gz.chunked`;
+                logToTerminal(`Use: RETRANSMIT ${filename} ${missingPkts.slice(0, 5).join(' ')}`, 'info');
+            }
+            return;
+        }
+    }
+
+    logToTerminal(`No matching image reception found for ${totalPkts} packets`, 'warning');
+}
+
+// ============================================================================
+// Beacon Data
+// ============================================================================
+
+/**
+ * Unpack health beacon packet
+ * Packet format: [4-byte ID][4-byte uptime][4-byte cpu][4-byte ram][4-byte disk][4-byte temp]
+ * @param {Uint8Array} data - 24-byte beacon packet
+ */
+function unpackBeacon(data) {
+    if (data.length < 24) {
+        logToTerminal(`Invalid BECN packet size: ${data.length} bytes`, 'warning');
+        return;
+    }
+
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const uptime = view.getUint32(4, true);
+    const cpu = view.getFloat32(8, true);
+    const ram = view.getFloat32(12, true);
+    const disk = view.getFloat32(16, true);
+    const temp = view.getFloat32(20, true);
+
+    // Format uptime as HH:MM:SS
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = uptime % 60;
+    const uptimeStr = `${hours}h ${minutes}m ${seconds}s`;
+
+    logToTerminal(`BEACON | Uptime: ${uptimeStr} | CPU: ${cpu.toFixed(1)}% | RAM: ${ram.toFixed(1)}% | Disk: ${disk.toFixed(1)}% | Temp: ${temp.toFixed(1)}°C`, 'response');
+
+    // Update telemetry display elements
+    const cpuElement = document.getElementById('cpuUsage');
+    if (cpuElement) cpuElement.textContent = `${cpu.toFixed(0)}%`;
+
+    const tempElement = document.getElementById('temperature');
+    if (tempElement) tempElement.textContent = `${temp.toFixed(1)}°C`;
+
+    const ramElement = document.getElementById('ramUsage');
+    if (ramElement) ramElement.textContent = `${ram.toFixed(0)}%`;
+
+    const diskElement = document.getElementById('diskUsage');
+    if (diskElement) diskElement.textContent = `${disk.toFixed(0)}%`;
 }
 
 // ============================================================================
