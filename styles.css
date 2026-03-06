@@ -493,6 +493,20 @@ body {
     font-family: 'Courier New', monospace;
 }
 
+.telemetry-value-sm {
+    font-size: clamp(10px, 2.5vw, 13px);
+}
+
+.telemetry-section-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border-color);
+}
+
 /* Radio Configuration */
 .radio-config {
     display: flex;
