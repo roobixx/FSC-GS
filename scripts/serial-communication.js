@@ -152,86 +152,37 @@ function processReceivedData(data) {
 
     // Process data
     while (dataBuffer.length > 0) {
-        // Check for SEND packet (image data) - variable length
+        // Check for SEND packet (image data) - newline-delimited
         if (dataBuffer.length >= 5) { // Minimum: SEND(4) + 1 char
             const identifier = new TextDecoder().decode(dataBuffer.slice(0, 4)).replace(/\0/g, '').trim();
-            
+
             // Handle both SEND and RETX packets (RETX are retransmitted chunks)
             if (identifier === 'SEND' || identifier === 'RETX') {
-                // Find the end of the packet
-                // Look for where base64+digits end (before any spaces or text like "Received")
-                let packetEnd = -1;
-                for (let i = 4; i < Math.min(dataBuffer.length, 1024); i++) {
-                    const char = dataBuffer[i];
-                    
-                    // Valid packet chars: A-Z, a-z, 0-9, /, +, =
-                    // ASCII: A-Z (65-90), a-z (97-122), 0-9 (48-57), / (47), + (43), = (61)
-                    const isValid = (char >= 65 && char <= 90) ||   // A-Z
-                                   (char >= 97 && char <= 122) ||  // a-z
-                                   (char >= 48 && char <= 57) ||   // 0-9
-                                   char === 47 ||                   // /
-                                   char === 43 ||                   // +
-                                   char === 61;                     // =
-                    
-                    if (!isValid) {
-                        // Found end of valid packet data
-                        packetEnd = i;
+                // Find newline delimiter (all packets end with \n from radio.py)
+                let newlinePos = -1;
+                for (let i = 4; i < dataBuffer.length; i++) {
+                    if (dataBuffer[i] === 0x0A || dataBuffer[i] === 0x0D) {
+                        newlinePos = i;
                         break;
                     }
-                    
-                    // Also check if we hit another packet identifier
-                    if (i + 4 <= dataBuffer.length) {
-                        const nextId = new TextDecoder().decode(dataBuffer.slice(i, i + 4));
-                        if (nextId === 'SEND' || nextId === 'RETX' || ['GYRO', 'ACCL', 'MAGN', 'GRAV', 'EULR', 'BMED', 'POLL', 
-                             'OBCR', 'OBCD', 'OBCC', 'OBCL', 'OBCP', 'ADCS', 'EPSS', 
-                             'HOST', 'SOLR'].includes(nextId)) {
-                            packetEnd = i;
-                            break;
-                        }
-                    }
                 }
-                
-                // If we didn't find an end and we're at the end of buffer, use the full buffer
-                if (packetEnd === -1 && dataBuffer.length < 1024) {
-                    // Check if there's a newline we missed
-                    for (let i = 4; i < dataBuffer.length; i++) {
-                        if (dataBuffer[i] === 0x0A || dataBuffer[i] === 0x0D) {
-                            packetEnd = i;
-                            break;
-                        }
-                    }
-                    
-                    // If still no end found, use entire buffer (for short responses like "SENDroot")
-                    if (packetEnd === -1) {
-                        packetEnd = dataBuffer.length;
-                    }
-                }
-                
-                if (packetEnd > 4) { // Must have at least SEND/RETX(4) + some data
-                    // Process image packet (works for both SEND and RETX)
-                    const packet = dataBuffer.slice(0, packetEnd);
+
+                if (newlinePos > 4) {
+                    // Complete packet found — process it
+                    const packet = dataBuffer.slice(0, newlinePos);
                     if (typeof processImagePacket === 'function') {
                         processImagePacket(packet);
                     }
-                    
-                    // Skip the packet and any trailing text up to newline
-                    let skipTo = packetEnd;
-                    for (let i = packetEnd; i < dataBuffer.length; i++) {
-                        if (dataBuffer[i] === 0x0A || dataBuffer[i] === 0x0D) {
-                            skipTo = i + 1;
-                            break;
-                        }
-                    }
-                    
-                    dataBuffer = dataBuffer.slice(skipTo);
-                    // Skip any additional newlines
+
+                    // Skip past newline(s)
+                    dataBuffer = dataBuffer.slice(newlinePos + 1);
                     while (dataBuffer.length > 0 && (dataBuffer[0] === 0x0A || dataBuffer[0] === 0x0D)) {
                         dataBuffer = dataBuffer.slice(1);
                     }
                     blinkLED('rfm95RxLed');
                     continue;
-                } else if (dataBuffer.length < 1024) {
-                    // Wait for more data
+                } else {
+                    // No newline yet — wait for more data
                     break;
                 }
             }
@@ -242,9 +193,9 @@ function processReceivedData(data) {
             const identifier = new TextDecoder().decode(dataBuffer.slice(0, 4)).replace(/\0/g, '').trim();
             
             // List of known binary packet identifiers
-            const binaryIdentifiers = ['GYRO', 'ACCL', 'MAGN', 'GRAV', 'EULR', 'BMED', 'POLL', 
-                                     'OBCR', 'OBCD', 'OBCC', 'OBCL', 'OBCP', 'ADCS', 'EPSS', 
-                                     'HOST', 'SOLR', 'RETX'];
+            const binaryIdentifiers = ['GYRO', 'ACCL', 'MAGN', 'GRAV', 'EULR', 'BME2', 'TEMP', 'POLL',
+                                     'OBCR', 'OBCD', 'OBCC', 'OBCL', 'OBCP', 'ADCS', 'EPSS',
+                                     'HOST', 'SOLR', 'RETX', 'XFRC', 'BECN', 'QUAT', 'PHOT'];
             
             if (binaryIdentifiers.includes(identifier)) {
                 const packetSize = getPacketSize(identifier);
@@ -418,14 +369,24 @@ function parseRadioConfigFromBuffer(buffer) {
 function getPacketSize(identifier) {
     const packetSizes = {
         'GYRO': 16, 'ACCL': 16, 'MAGN': 16, 'GRAV': 16, 'EULR': 16,
-        'BMED': 16, 'POLL': -1, // Variable size
+        'BME2': 16, 'TEMP': 8, 'QUAT': 20, 'POLL': -1, // Variable size
         'OBCR': 8, 'OBCD': 8, 'OBCC': 8,
         'OBCL': 234, 'OBCP': 234,
         'ADCS': 32, 'EPSS': 28, 'HOST': 15, 'SOLR': 36,
-        'RETX': -1 // Variable size
+        'RETX': -1, // Variable size
+        'XFRC': 8,  // 4 + uint32 total_packets
+        'BECN': 24  // 4 + uint32 uptime + 4*float (cpu, ram, disk, temp)
     };
 
-    if (identifier === 'POLL') {
+    if (identifier === 'PHOT') {
+        // Variable: 4-byte ID + 4-byte length + filename
+        if (dataBuffer.length >= 8) {
+            const view = new DataView(dataBuffer.buffer, dataBuffer.byteOffset, 8);
+            const payloadLength = view.getUint32(4, true);
+            return 8 + payloadLength;
+        }
+        return -1;
+    } else if (identifier === 'POLL') {
         if (dataBuffer.length >= 8) {
             const view = new DataView(dataBuffer.buffer, dataBuffer.byteOffset, 8);
             const payloadLength = view.getUint32(4, true);
