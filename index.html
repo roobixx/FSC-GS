@@ -166,22 +166,78 @@
                         <span>📊</span> Live Telemetry
                     </div>
                     <div class="panel-content">
+                        <!-- OBC Section -->
+                        <div class="telemetry-section-label">Onboard Computer</div>
                         <div class="telemetry-grid" id="telemetryGrid">
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Battery Voltage</div>
-                                <div class="telemetry-value" id="batteryVoltage">--.-V</div>
+                                <div class="telemetry-label">CPU</div>
+                                <div class="telemetry-value" id="cpuUsage">--%</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Temperature</div>
-                                <div class="telemetry-value" id="temperature">--.-°C</div>
+                                <div class="telemetry-label">RAM</div>
+                                <div class="telemetry-value" id="ramUsage">--%</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">Disk Usage</div>
+                                <div class="telemetry-label">Disk</div>
                                 <div class="telemetry-value" id="diskUsage">--%</div>
                             </div>
                             <div class="telemetry-item">
-                                <div class="telemetry-label">RAM Usage</div>
-                                <div class="telemetry-value" id="ramUsage">--%</div>
+                                <div class="telemetry-label">Temp</div>
+                                <div class="telemetry-value" id="temperature">--°C</div>
+                            </div>
+                        </div>
+
+                        <!-- Power Section -->
+                        <div class="telemetry-section-label" style="margin-top: 12px;">Power System</div>
+                        <div class="telemetry-grid">
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Battery</div>
+                                <div class="telemetry-value" id="batteryVoltage">--.-V</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">EPS Status</div>
+                                <div class="telemetry-value" id="epsStatus">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Ch 1</div>
+                                <div class="telemetry-value" id="epsCh1">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Ch 2</div>
+                                <div class="telemetry-value" id="epsCh2">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Ch 3</div>
+                                <div class="telemetry-value" id="epsCh3">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Ch 4</div>
+                                <div class="telemetry-value" id="epsCh4">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Solar Section -->
+                        <div class="telemetry-section-label" style="margin-top: 12px;">Solar Panels</div>
+                        <div class="telemetry-grid">
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">X-</div>
+                                <div class="telemetry-value telemetry-value-sm" id="solarXn">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">X+</div>
+                                <div class="telemetry-value telemetry-value-sm" id="solarXp">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Y-</div>
+                                <div class="telemetry-value telemetry-value-sm" id="solarYn">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Y+</div>
+                                <div class="telemetry-value telemetry-value-sm" id="solarYp">--</div>
+                            </div>
+                            <div class="telemetry-item">
+                                <div class="telemetry-label">Total Power</div>
+                                <div class="telemetry-value" id="solarTotal">--W</div>
                             </div>
                         </div>
                     </div>
