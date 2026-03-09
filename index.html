@@ -3,359 +3,481 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TEMPEST - WebSerial Interface</title>
+    <title>TEMPEST - WebSerial Ground Station</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="mainInterface">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-title">
-                <span>🛰️</span> TEMPEST Ground Station
-            </div>
-            <div class="header-status">
-                <div class="connection-status">
-                    <div class="status-indicator" id="statusIndicator"></div>
-                    <span id="connectionStatus">Disconnected</span>
-                </div>
-                <div class="port-info" id="portInfo"></div>
-            </div>
+    <!-- ═══ TOP CLASSIFICATION BANNER ═══ -->
+    <div class="classification-banner classification-banner--unclassified" id="classTopBanner">
+        UNCLASSIFIED
+    </div>
+
+    <!-- ═══ GLOBAL STATUS BAR ═══ -->
+    <div class="gsb">
+        <div class="gsb__app-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
+        </div>
+        <div class="gsb__app-meta">
+            <span class="gsb__app-domain">ETHOS Labs</span>
+            <span class="gsb__app-name">TEMPEST Ground Station</span>
+        </div>
+        <span class="gsb__app-version">v2.0</span>
+
+        <!-- Navigation Tabs -->
+        <div class="gsb__tabs">
+            <button class="gsb__tab gsb__tab--active" data-tab="operate">Operate</button>
+            <button class="gsb__tab" data-tab="configure">Configure</button>
         </div>
 
-        <div class="container">
-            <!-- Left Column: Connection & Configuration -->
-            <div class="left-column">
-                <!-- Connection Panel -->
-                <div class="panel">
-                    <div class="panel-header" onclick="togglePanelMobile(this)">
-                        <span>📡</span> Connection Control
-                    </div>
-                    <div class="panel-content">
-                        <div class="connection-status">
-                            <button class="btn btn-primary" id="connectBtn" onclick="toggleConnection()" style="width: 100%;">
-                                Connect to Ground Station
-                            </button>
-                        </div>
-                        <button class="btn btn-secondary" id="resetBtn" onclick="softReset()" disabled style="width: 100%;">
-                            Soft Reset
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Radio Configuration -->
-                <div class="panel">
-                    <div class="panel-header" onclick="togglePanelMobile(this)">
-                        <span>📻</span> Radio Configuration
-                    </div>
-                    <div class="panel-content">
-                        <!-- Uplink Radio Config -->
-                        <div class="radio-section">
-                            <label>📡 Uplink Radio (Ground → Satellite)</label>
-                            <div class="radio-grid">
-                                <select class="settings-input" id="uplinkRadio">
-                                    <option value="rfm95">RFM95 (LoRa)</option>
-                                    <option value="rfm69">RFM69 (FSK)</option>
-                                </select>
-                                <select class="settings-input" id="uplinkBand" onchange="updateFrequencyRange('uplink')">
-                                    <option value="433">433 MHz</option>
-                                    <option value="868">868 MHz</option>
-                                    <option value="915" selected>915 MHz</option>
-                                </select>
-                            </div>
-                            <div class="freq-grid">
-                                <label style="font-size: 12px;">Freq:</label>
-                                <input type="number" class="settings-input" id="uplinkFreq" 
-                                       min="902" max="928" step="0.1" value="915.0"
-                                       onchange="validateFrequency('uplink')">
-                                <span style="font-size: 12px;">MHz</span>
-                            </div>
-                            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;" id="uplinkFreqRange">
-                                Valid range: 902.0 - 928.0 MHz
-                            </div>
-                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center;">
-                                <label style="font-size: 12px;">🛰️ Satellite:</label>
-                                <input type="number" class="settings-input" id="satelliteAddress" 
-                                       min="0" max="255" value="255">
-                            </div>
-                        </div>
-
-                        <!-- Downlink Radio Config -->
-                        <div class="radio-section">
-                            <label>📡 Downlink Radio (Satellite → Ground)</label>
-                            <div class="radio-grid">
-                                <select class="settings-input" id="downlinkRadio">
-                                    <option value="rfm95">RFM95 (LoRa)</option>
-                                    <option value="rfm69">RFM69 (FSK)</option>
-                                </select>
-                                <select class="settings-input" id="downlinkBand" onchange="updateFrequencyRange('downlink')">
-                                    <option value="433">433 MHz</option>
-                                    <option value="868">868 MHz</option>
-                                    <option value="915" selected>915 MHz</option>
-                                </select>
-                            </div>
-                            <div class="freq-grid">
-                                <label style="font-size: 12px;">Freq:</label>
-                                <input type="number" class="settings-input" id="downlinkFreq" 
-                                       min="902" max="928" step="0.1" value="915.0"
-                                       onchange="validateFrequency('downlink')">
-                                <span style="font-size: 12px;">MHz</span>
-                            </div>
-                            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;" id="downlinkFreqRange">
-                                Valid range: 902.0 - 928.0 MHz
-                            </div>
-                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center;">
-                                <label style="font-size: 12px;">Ground Node:</label>
-                                <input type="number" class="settings-input" id="downlinkNode" 
-                                       min="0" max="255" value="255">
-                            </div>
-                        </div>
-
-                        <button class="btn btn-primary" onclick="configureRadios()" style="width: 100%; margin-bottom: 8px;">
-                            Apply Radio Configuration
-                        </button>
-                        <button class="btn btn-secondary" onclick="queryRadioConfig()" style="width: 100%; margin-bottom: 15px;">
-                            Query Current Config
-                        </button>
-                        
-                        <div class="led-indicators">
-                            <div class="led-item">
-                                <div class="led" id="rfm95TxLed"></div>
-                                <span>RFM95 TX</span>
-                            </div>
-                            <div class="led-item">
-                                <div class="led" id="rfm95RxLed"></div>
-                                <span>RFM95 RX</span>
-                            </div>
-                            <div class="led-item">
-                                <div class="led" id="rfm69TxLed"></div>
-                                <span>RFM69 TX</span>
-                            </div>
-                            <div class="led-item">
-                                <div class="led" id="rfm69RxLed"></div>
-                                <span>RFM69 RX</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Settings Button -->
-                <button class="btn btn-secondary" onclick="openSettings()" style="width: 100%;">
-                    ⚙️ Settings
-                </button>
-            </div>
-
-            <!-- Middle Column: Terminal & Data -->
-            <div class="middle-column">
-                <!-- Terminal Output -->
-                <div class="panel terminal-panel">
-                    <div class="panel-header" onclick="togglePanelMobile(this)">
-                        <span>💻</span> Terminal Output
-                        <button class="btn btn-secondary" onclick="clearTerminal()" style="margin-left: auto; padding: 6px 12px; font-size: 12px;">
-                            Clear
-                        </button>
-                    </div>
-                    <div class="panel-content" style="flex: 1; overflow: hidden;">
-                        <div class="terminal" id="terminal"></div>
-                    </div>
-                </div>
-
-                <!-- Telemetry Display -->
-                <div class="panel telemetry-panel">
-                    <div class="panel-header" onclick="togglePanelMobile(this)">
-                        <span>📊</span> Live Telemetry
-                    </div>
-                    <div class="panel-content">
-                        <!-- OBC Section -->
-                        <div class="telemetry-section-label">Onboard Computer</div>
-                        <div class="telemetry-grid" id="telemetryGrid">
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">CPU</div>
-                                <div class="telemetry-value" id="cpuUsage">--%</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">RAM</div>
-                                <div class="telemetry-value" id="ramUsage">--%</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Disk</div>
-                                <div class="telemetry-value" id="diskUsage">--%</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Temp</div>
-                                <div class="telemetry-value" id="temperature">--°C</div>
-                            </div>
-                        </div>
-
-                        <!-- Power Section -->
-                        <div class="telemetry-section-label" style="margin-top: 12px;">Power System</div>
-                        <div class="telemetry-grid">
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Battery</div>
-                                <div class="telemetry-value" id="batteryVoltage">--.-V</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">EPS Status</div>
-                                <div class="telemetry-value" id="epsStatus">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Ch 1</div>
-                                <div class="telemetry-value" id="epsCh1">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Ch 2</div>
-                                <div class="telemetry-value" id="epsCh2">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Ch 3</div>
-                                <div class="telemetry-value" id="epsCh3">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Ch 4</div>
-                                <div class="telemetry-value" id="epsCh4">--</div>
-                            </div>
-                        </div>
-
-                        <!-- Solar Section -->
-                        <div class="telemetry-section-label" style="margin-top: 12px;">Solar Panels</div>
-                        <div class="telemetry-grid">
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">X-</div>
-                                <div class="telemetry-value telemetry-value-sm" id="solarXn">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">X+</div>
-                                <div class="telemetry-value telemetry-value-sm" id="solarXp">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Y-</div>
-                                <div class="telemetry-value telemetry-value-sm" id="solarYn">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Y+</div>
-                                <div class="telemetry-value telemetry-value-sm" id="solarYp">--</div>
-                            </div>
-                            <div class="telemetry-item">
-                                <div class="telemetry-label">Total Power</div>
-                                <div class="telemetry-value" id="solarTotal">--W</div>
-                            </div>
-                        </div>
-                    </div>
+        <!-- Monitoring Icons -->
+        <div class="gsb__monitors">
+            <div class="gsb__monitor">
+                <div class="status-symbol status-symbol--off" id="monSerial"></div>
+                <div style="display:flex;flex-direction:column;">
+                    <span class="gsb__monitor-label">Serial</span>
+                    <span class="gsb__monitor-value" id="monSerialLabel">Off</span>
                 </div>
             </div>
-
-            <!-- Right Column: Command Sender -->
-            <div class="right-column">
-                <!-- Command Panel -->
-                <div class="panel">
-                    <div class="panel-header" onclick="togglePanelMobile(this)">
-                        <span>⌨️</span> Command Center
-                    </div>
-                    <div class="panel-content">
-                        <div class="command-section">
-                            <input type="text" class="command-input" id="commandInput" 
-                                   placeholder="Enter command..." disabled
-                                   onkeydown="if(event.key === 'Enter') sendCommand()">
-                            <button class="btn btn-primary" onclick="sendCommand()" disabled id="sendBtn">
-                                Send Command
-                            </button>
-                            
-                            <div>
-                                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 8px;">
-                                    Quick Commands:
-                                </label>
-                                <div class="command-buttons">
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_SOLAR')">Solar</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('EPS_STATUS')">Electrical</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_GYRO')">Gyro</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_ORIENTATION')">Orient</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_BME')">BME</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_ACCEL')">Accel</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_MAG')">Mag</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_TEMP')">Temp</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('OBC_DISK')">Disk</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('OBC_RAM')">RAM</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('OBC_PROCESSES')">Proc</button>
-                                    <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_HOSTNAME')">Host</button>
-                                </div>
-                            </div>
-                            
-                            <button class="btn btn-secondary" onclick="showHelp()" style="width: 100%;">
-                                Show All Commands
-                            </button>
-                            
-                            <!-- Image Management Section -->
-                            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color);">
-                                <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 8px;">
-                                    Image Management:
-                                </label>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                                    <button class="btn btn-secondary" onclick="showActiveImages()" style="font-size: 11px; padding: 6px 8px;">
-                                        Active Images
-                                    </button>
-                                    <button class="btn btn-secondary" onclick="clearImageBuffers()" style="font-size: 11px; padding: 6px 8px;">
-                                        Clear Buffers
-                                    </button>
-                                </div>
-                                <input type="text" class="command-input" id="retransmitInput" 
-                                       placeholder="e.g., 5.jpg.gz 1,5,10" style="font-size: 11px; margin-bottom: 8px;">
-                                <button class="btn btn-secondary" onclick="manualRetransmit()" style="width: 100%; font-size: 11px; padding: 6px 8px;">
-                                    Manual Retransmit
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            <div class="gsb__monitor">
+                <div class="status-symbol status-symbol--off" id="monUplink"></div>
+                <div style="display:flex;flex-direction:column;">
+                    <span class="gsb__monitor-label">Uplink</span>
+                    <span class="gsb__monitor-value" id="monUplinkLabel">Idle</span>
                 </div>
-                
-                <!-- Orientation Panel -->
-                <div class="panel orientation-panel">
-                    <div class="panel-header" onclick="togglePanelMobile(this)">
-                        <span>🛸</span> Satellite Orientation
-                        <button class="btn btn-secondary" onclick="sendPresetCommand('GET_ORIENTATION')" style="margin-left: auto; padding: 6px 12px; font-size: 12px;">
-                            Update
-                        </button>
-                    </div>
-                    <div class="panel-content">
-                        <div class="orientation-canvas" id="orientationCanvas"></div>
-                        <div class="orientation-values">
-                            <div class="orientation-value">
-                                <div class="orientation-label">Roll (X)</div>
-                                <div class="orientation-data" id="rollValue">0.0°</div>
-                            </div>
-                            <div class="orientation-value">
-                                <div class="orientation-label">Pitch (Y)</div>
-                                <div class="orientation-data" id="pitchValue">0.0°</div>
-                            </div>
-                            <div class="orientation-value">
-                                <div class="orientation-label">Yaw (Z)</div>
-                                <div class="orientation-data" id="yawValue">0.0°</div>
-                            </div>
-                        </div>
-                    </div>
+            </div>
+            <div class="gsb__monitor">
+                <div class="status-symbol status-symbol--off" id="monDownlink"></div>
+                <div style="display:flex;flex-direction:column;">
+                    <span class="gsb__monitor-label">Downlink</span>
+                    <span class="gsb__monitor-value" id="monDownlinkLabel">Idle</span>
                 </div>
+            </div>
+            <div class="astro-clock" id="astroClock">
+                <span class="astro-clock__utc-label">UTC</span>
+                <span class="astro-clock__time" id="clockTime">--:--:--</span>
+                <span class="astro-clock__date" id="clockDate">---</span>
             </div>
         </div>
     </div>
 
-    <!-- Settings Modal -->
+    <!-- ═══ APPLICATION BODY ═══ -->
+    <div class="app-body">
+
+        <!-- ══════ OPERATE TAB ══════ -->
+        <div class="tab-content tab-content--active" id="tab-operate">
+            <div class="container">
+                <!-- LEFT COLUMN -->
+                <div class="left-column">
+                    <!-- Connection Panel -->
+                    <div class="panel">
+                        <div class="panel-header" onclick="togglePanelMobile(this)">
+                            <div class="status-symbol status-symbol--off" id="connStatusDot" style="width:10px;height:10px;"></div>
+                            Connection
+                        </div>
+                        <div class="panel-content">
+                            <div class="connection-status">
+                                <div class="status-indicator" id="statusIndicator"></div>
+                                <span id="connectionStatus">Disconnected</span>
+                            </div>
+                            <button class="btn btn-primary" id="connectBtn" onclick="toggleConnection()" style="width: 100%;">
+                                Connect to Ground Station
+                            </button>
+                            <button class="btn btn-secondary" id="resetBtn" onclick="softReset()" disabled style="width: 100%;">
+                                Soft Reset
+                            </button>
+                            <div class="port-info" id="portInfo"></div>
+                        </div>
+                    </div>
+
+                    <!-- Radio Configuration -->
+                    <div class="panel">
+                        <div class="panel-header" onclick="togglePanelMobile(this)">
+                            Radio Configuration
+                        </div>
+                        <div class="panel-content">
+                            <!-- Uplink -->
+                            <div class="radio-section">
+                                <label>Uplink (Ground → Satellite)</label>
+                                <div class="radio-grid">
+                                    <select class="settings-input" id="uplinkRadio">
+                                        <option value="rfm95">RFM95 (LoRa)</option>
+                                        <option value="rfm69">RFM69 (FSK)</option>
+                                    </select>
+                                    <select class="settings-input" id="uplinkBand" onchange="updateFrequencyRange('uplink')">
+                                        <option value="433">433 MHz</option>
+                                        <option value="868">868 MHz</option>
+                                        <option value="915" selected>915 MHz</option>
+                                    </select>
+                                </div>
+                                <div class="freq-grid">
+                                    <label style="font-size: 12px;">Freq:</label>
+                                    <input type="number" class="settings-input" id="uplinkFreq"
+                                           min="902" max="928" step="0.1" value="915.0"
+                                           onchange="validateFrequency('uplink')">
+                                    <span style="font-size: 12px;">MHz</span>
+                                </div>
+                                <div style="font-size: 10px; color: var(--color-text-placeholder); margin-bottom: 8px;" id="uplinkFreqRange">
+                                    Range: 902.0 – 928.0 MHz
+                                </div>
+                                <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center;">
+                                    <label style="font-size: 12px;">Sat Node:</label>
+                                    <input type="number" class="settings-input" id="satelliteAddress"
+                                           min="0" max="255" value="255">
+                                </div>
+                            </div>
+
+                            <!-- Downlink -->
+                            <div class="radio-section">
+                                <label>Downlink (Satellite → Ground)</label>
+                                <div class="radio-grid">
+                                    <select class="settings-input" id="downlinkRadio">
+                                        <option value="rfm95">RFM95 (LoRa)</option>
+                                        <option value="rfm69">RFM69 (FSK)</option>
+                                    </select>
+                                    <select class="settings-input" id="downlinkBand" onchange="updateFrequencyRange('downlink')">
+                                        <option value="433">433 MHz</option>
+                                        <option value="868">868 MHz</option>
+                                        <option value="915" selected>915 MHz</option>
+                                    </select>
+                                </div>
+                                <div class="freq-grid">
+                                    <label style="font-size: 12px;">Freq:</label>
+                                    <input type="number" class="settings-input" id="downlinkFreq"
+                                           min="902" max="928" step="0.1" value="915.0"
+                                           onchange="validateFrequency('downlink')">
+                                    <span style="font-size: 12px;">MHz</span>
+                                </div>
+                                <div style="font-size: 10px; color: var(--color-text-placeholder); margin-bottom: 8px;" id="downlinkFreqRange">
+                                    Range: 902.0 – 928.0 MHz
+                                </div>
+                                <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center;">
+                                    <label style="font-size: 12px;">Gnd Node:</label>
+                                    <input type="number" class="settings-input" id="downlinkNode"
+                                           min="0" max="255" value="255">
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary" onclick="configureRadios()" style="width: 100%;">
+                                Apply Configuration
+                            </button>
+                            <button class="btn btn-secondary" onclick="queryRadioConfig()" style="width: 100%;">
+                                Query Current Config
+                            </button>
+
+                            <div class="led-indicators">
+                                <div class="led-item"><div class="led" id="rfm95TxLed"></div><span>RFM95 TX</span></div>
+                                <div class="led-item"><div class="led" id="rfm95RxLed"></div><span>RFM95 RX</span></div>
+                                <div class="led-item"><div class="led" id="rfm69TxLed"></div><span>RFM69 TX</span></div>
+                                <div class="led-item"><div class="led" id="rfm69RxLed"></div><span>RFM69 RX</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" onclick="openSettings()" style="width: 100%;">
+                        Settings
+                    </button>
+                </div>
+
+                <!-- MIDDLE COLUMN -->
+                <div class="middle-column">
+                    <!-- Terminal / Event Log -->
+                    <div class="panel terminal-panel">
+                        <div class="panel-header" onclick="togglePanelMobile(this)">
+                            Event Log
+                            <button class="btn btn-secondary" onclick="clearTerminal()" style="margin-left: auto; padding: 4px 10px; font-size: 11px; min-height: 26px;">
+                                Clear
+                            </button>
+                        </div>
+                        <div class="panel-content" style="flex: 1; overflow: hidden; min-height: 0;">
+                            <div class="terminal" id="terminal"></div>
+                        </div>
+                    </div>
+
+                    <!-- Telemetry -->
+                    <div class="panel telemetry-panel">
+                        <div class="panel-header" onclick="togglePanelMobile(this)">
+                            Live Telemetry
+                        </div>
+                        <div class="panel-content">
+                            <!-- OBC Section -->
+                            <div class="telemetry-section-label">Onboard Computer</div>
+                            <div class="telemetry-grid" id="telemetryGrid">
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">CPU</div>
+                                    <div class="telemetry-value" id="cpuUsage">--%</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">RAM</div>
+                                    <div class="telemetry-value" id="ramUsage">--%</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Disk</div>
+                                    <div class="telemetry-value" id="diskUsage">--%</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Temp</div>
+                                    <div class="telemetry-value" id="temperature">--°C</div>
+                                </div>
+                            </div>
+
+                            <!-- Power Section -->
+                            <div class="telemetry-section-label" style="margin-top: 12px;">Power System</div>
+                            <div class="telemetry-grid">
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Battery</div>
+                                    <div class="telemetry-value" id="batteryVoltage">--.-V</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">EPS Status</div>
+                                    <div class="telemetry-value" id="epsStatus">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Ch 1</div>
+                                    <div class="telemetry-value" id="epsCh1">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Ch 2</div>
+                                    <div class="telemetry-value" id="epsCh2">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Ch 3</div>
+                                    <div class="telemetry-value" id="epsCh3">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Ch 4</div>
+                                    <div class="telemetry-value" id="epsCh4">--</div>
+                                </div>
+                            </div>
+
+                            <!-- Solar Section -->
+                            <div class="telemetry-section-label" style="margin-top: 12px;">Solar Panels</div>
+                            <div class="telemetry-grid">
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">X-</div>
+                                    <div class="telemetry-value telemetry-value-sm" id="solarXn">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">X+</div>
+                                    <div class="telemetry-value telemetry-value-sm" id="solarXp">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Y-</div>
+                                    <div class="telemetry-value telemetry-value-sm" id="solarYn">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Y+</div>
+                                    <div class="telemetry-value telemetry-value-sm" id="solarYp">--</div>
+                                </div>
+                                <div class="telemetry-item">
+                                    <div class="telemetry-label">Total Power</div>
+                                    <div class="telemetry-value" id="solarTotal">--W</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN -->
+                <div class="right-column">
+                    <!-- Command Center -->
+                    <div class="panel">
+                        <div class="panel-header" onclick="togglePanelMobile(this)">
+                            Command
+                        </div>
+                        <div class="panel-content">
+                            <div class="command-section">
+                                <input type="text" class="command-input" id="commandInput"
+                                       placeholder="Enter command..." disabled
+                                       onkeydown="if(event.key === 'Enter') sendCommand()">
+                                <button class="btn btn-primary" onclick="sendCommand()" disabled id="sendBtn">
+                                    Send Command
+                                </button>
+
+                                <div>
+                                    <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 8px;">
+                                        Quick Commands:
+                                    </label>
+                                    <div class="command-buttons">
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_SOLAR')">Solar</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('EPS_STATUS')">EPS</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_GYRO')">Gyro</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_ORIENTATION')">Orient</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_BME')">BME</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_ACCEL')">Accel</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_MAG')">Mag</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_TEMP')">Temp</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('OBC_DISK')">Disk</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('OBC_RAM')">RAM</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('OBC_PROCESSES')">Proc</button>
+                                        <button class="btn btn-secondary command-preset" onclick="sendPresetCommand('GET_HOSTNAME')">Host</button>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-secondary" onclick="showHelp()" style="width: 100%;">
+                                    All Commands
+                                </button>
+
+                                <!-- Image Management -->
+                                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--color-border-interactive-muted);">
+                                    <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 8px;">
+                                        Image Management:
+                                    </label>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                                        <button class="btn btn-secondary" onclick="showActiveImages()" style="font-size: 11px; padding: 6px 8px;">
+                                            Active Images
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="clearImageBuffers()" style="font-size: 11px; padding: 6px 8px;">
+                                            Clear Buffers
+                                        </button>
+                                    </div>
+                                    <input type="text" class="command-input" id="retransmitInput"
+                                           placeholder="e.g., 5.jpg.gz 1,5,10" style="font-size: 11px; margin-bottom: 8px;">
+                                    <button class="btn btn-secondary" onclick="manualRetransmit()" style="width: 100%; font-size: 11px; padding: 6px 8px;">
+                                        Manual Retransmit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orientation -->
+                    <div class="panel orientation-panel">
+                        <div class="panel-header" onclick="togglePanelMobile(this)">
+                            Satellite Orientation
+                            <button class="btn btn-secondary" onclick="sendPresetCommand('GET_ORIENTATION')" style="margin-left: auto; padding: 4px 10px; font-size: 11px; min-height: 26px;">
+                                Update
+                            </button>
+                        </div>
+                        <div class="panel-content">
+                            <div class="orientation-canvas" id="orientationCanvas"></div>
+                            <div class="orientation-values">
+                                <div class="orientation-value">
+                                    <div class="orientation-label">Roll (X)</div>
+                                    <div class="orientation-data" id="rollValue">0.0°</div>
+                                </div>
+                                <div class="orientation-value">
+                                    <div class="orientation-label">Pitch (Y)</div>
+                                    <div class="orientation-data" id="pitchValue">0.0°</div>
+                                </div>
+                                <div class="orientation-value">
+                                    <div class="orientation-label">Yaw (Z)</div>
+                                    <div class="orientation-data" id="yawValue">0.0°</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════ CONFIGURE TAB ══════ -->
+        <div class="tab-content" id="tab-configure">
+            <div class="container">
+                <div style="width: 100%; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding: 4px;">
+
+                    <!-- Serial Port Settings -->
+                    <div class="panel">
+                        <div class="panel-header">Serial Port</div>
+                        <div class="panel-content">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div>
+                                    <label class="settings-label">Baud Rate</label>
+                                    <input type="number" class="settings-input" id="baudRate" value="115200" style="width:100%;">
+                                </div>
+                                <div>
+                                    <label class="settings-label">Data Bits</label>
+                                    <input type="number" class="settings-input" id="dataBits" value="8" style="width:100%;">
+                                </div>
+                                <div>
+                                    <label class="settings-label">Stop Bits</label>
+                                    <input type="number" class="settings-input" id="stopBits" value="1" style="width:100%;">
+                                </div>
+                                <div>
+                                    <label class="settings-label">Parity</label>
+                                    <select class="settings-input" id="parity" style="width:100%;">
+                                        <option value="none">None</option>
+                                        <option value="even">Even</option>
+                                        <option value="odd">Odd</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="settings-label">Flow Control</label>
+                                    <select class="settings-input" id="flowControl" style="width:100%;">
+                                        <option value="none">None</option>
+                                        <option value="hardware">Hardware</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Classification Level -->
+                    <div class="panel">
+                        <div class="panel-header">Classification</div>
+                        <div class="panel-content">
+                            <label class="settings-label">Display Classification Level</label>
+                            <select class="settings-input" id="classificationLevel" onchange="updateClassification()" style="width:100%;">
+                                <option value="unclassified" selected>UNCLASSIFIED</option>
+                                <option value="cui">CUI</option>
+                                <option value="secret">SECRET</option>
+                                <option value="topsecret">TOP SECRET</option>
+                                <option value="topsecretsci">TOP SECRET//SCI</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Application Info -->
+                    <div class="panel">
+                        <div class="panel-header">About</div>
+                        <div class="panel-content">
+                            <div style="font-size: 13px; color: var(--color-text-secondary); line-height: 1.8;">
+                                <div><strong style="color: var(--color-text-primary);">Application:</strong> TEMPEST Ground Station</div>
+                                <div><strong style="color: var(--color-text-primary);">Version:</strong> 2.0</div>
+                                <div><strong style="color: var(--color-text-primary);">Organization:</strong> ETHOS Labs, LLC</div>
+                                <div><strong style="color: var(--color-text-primary);">Design System:</strong> Astro UXDS (US Space Force)</div>
+                                <div><strong style="color: var(--color-text-primary);">Platform:</strong> TEMPEST CubeSat Educational Platform</div>
+                                <div style="margin-top: 8px; font-size: 11px; color: var(--color-text-placeholder);">
+                                    WebSerial interface for ground station communication with the TEMPEST satellite.
+                                    Supports RFM95 (LoRa) and RFM69 (FSK) radio modules across 433/868/915 MHz ISM bands.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ═══ BOTTOM CLASSIFICATION BANNER ═══ -->
+    <div class="classification-banner classification-banner--unclassified" id="classBotBanner">
+        UNCLASSIFIED
+    </div>
+
+    <!-- ═══ SETTINGS MODAL (legacy, kept for compatibility) ═══ -->
     <div class="modal" id="settingsModal">
         <div class="modal-content">
-            <div class="modal-header">Settings</div>
+            <div class="modal-header">Serial Port Settings</div>
             <div class="settings-group">
                 <label class="settings-label">Baud Rate</label>
-                <input type="number" class="settings-input" id="baudRate" value="115200">
+                <input type="number" class="settings-input" id="baudRateModal" value="115200" style="width:100%;">
             </div>
             <div class="settings-group">
                 <label class="settings-label">Data Bits</label>
-                <input type="number" class="settings-input" id="dataBits" value="8">
+                <input type="number" class="settings-input" id="dataBitsModal" value="8" style="width:100%;">
             </div>
             <div class="settings-group">
                 <label class="settings-label">Stop Bits</label>
-                <input type="number" class="settings-input" id="stopBits" value="1">
+                <input type="number" class="settings-input" id="stopBitsModal" value="1" style="width:100%;">
             </div>
             <div class="settings-group">
                 <label class="settings-label">Parity</label>
-                <select class="settings-input" id="parity">
+                <select class="settings-input" id="parityModal" style="width:100%;">
                     <option value="none">None</option>
                     <option value="even">Even</option>
                     <option value="odd">Odd</option>
@@ -363,12 +485,15 @@
             </div>
             <div class="settings-group">
                 <label class="settings-label">Flow Control</label>
-                <select class="settings-input" id="flowControl">
+                <select class="settings-input" id="flowControlModal" style="width:100%;">
                     <option value="none">None</option>
                     <option value="hardware">Hardware</option>
                 </select>
             </div>
-            <button class="btn btn-primary" onclick="closeSettings()">Close</button>
+            <div style="display:flex; gap:8px; justify-content: flex-end;">
+                <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+                <button class="btn btn-primary" onclick="closeSettings()">Confirm</button>
+            </div>
         </div>
     </div>
 
