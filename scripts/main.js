@@ -61,6 +61,11 @@ function updateConnectionStatus(connected) {
     const sendBtn = document.getElementById('sendBtn');
     const commandInput = document.getElementById('commandInput');
 
+    // GSB monitor elements
+    const monSerial = document.getElementById('monSerial');
+    const monSerialLabel = document.getElementById('monSerialLabel');
+    const connDot = document.getElementById('connStatusDot');
+
     if (connected) {
         indicator.classList.add('connected');
         status.textContent = 'Connected';
@@ -68,6 +73,9 @@ function updateConnectionStatus(connected) {
         resetBtn.disabled = false;
         sendBtn.disabled = false;
         commandInput.disabled = false;
+        if (monSerial) { monSerial.className = 'status-symbol status-symbol--normal'; }
+        if (monSerialLabel) { monSerialLabel.textContent = 'On'; }
+        if (connDot) { connDot.className = 'status-symbol status-symbol--normal'; }
     } else {
         indicator.classList.remove('connected');
         status.textContent = 'Disconnected';
@@ -75,6 +83,9 @@ function updateConnectionStatus(connected) {
         resetBtn.disabled = true;
         sendBtn.disabled = true;
         commandInput.disabled = true;
+        if (monSerial) { monSerial.className = 'status-symbol status-symbol--off'; }
+        if (monSerialLabel) { monSerialLabel.textContent = 'Off'; }
+        if (connDot) { connDot.className = 'status-symbol status-symbol--off'; }
     }
 }
 
@@ -101,6 +112,17 @@ function blinkLED(ledId, duration = 100) {
     if (led) {
         led.classList.add('active');
         setTimeout(() => led.classList.remove('active'), duration);
+    }
+
+    // Flash GSB monitors on TX/RX activity
+    if (ledId.includes('Tx')) {
+        flashMonitor('monUplink', 'normal', duration);
+        const label = document.getElementById('monUplinkLabel');
+        if (label) { label.textContent = 'TX'; setTimeout(() => { label.textContent = 'Idle'; }, duration); }
+    } else if (ledId.includes('Rx')) {
+        flashMonitor('monDownlink', 'normal', duration);
+        const label = document.getElementById('monDownlinkLabel');
+        if (label) { label.textContent = 'RX'; setTimeout(() => { label.textContent = 'Idle'; }, duration); }
     }
 }
 
@@ -285,7 +307,7 @@ function showHelp() {
         '- GET_SOLAR: Get Solar Panel Voltages and Currents',
         '- EPS_STATUS: Get All EPS Values',
         '- EPS CH<n>,<0 or 1>: Set EPS Channel Off/On',
-        '- ENV_POLL: Poll All Environmental Sensors*',
+        '- ENV_POLL: Poll All Environmental Sensors',
         '- GET_GYRO: Get Gyroscope Values (X,Y,Z)',
         '- GET_MAG: Get Magnetometer Values (X,Y,Z)',
         '- GET_ACCEL: Get Acceleration Values (X, Y, Z)',
@@ -294,16 +316,21 @@ function showHelp() {
         '- GET_QUATERNION: Get Satellite Orientation in Quaternion',
         '- GET_BME: Get Pressure, Temperature, Humidity, Altitude',
         '- GET_TEMP: Get Temperature from IMU',
-        '- OBC_LIST_FILES <filepath>: List Files in Given Path*',
+        '- OBC_LIST_FILES <filepath>: List Files in Given Path',
         '- OBC_PROCESSES: List Running Processes on OBC',
         '- OBC_DISK: Get OBC Disk Usage',
         '- OBC_RAM: Get OBC RAM Usage',
         '- OBC_SHUTDOWN: Shut Down OBC',
         '- OBC_RESTART: Reboot OBC',
         '- TAKE_PHOTO: Take Photo Using Onboard Camera',
-        '- SEND_IMAGE <path>: Send Image Down to Ground Station*',
+        '- SEND_IMAGE <path>: Send Image Down to Ground Station',
         '- RETRANSMIT <path> <packets>: Retransmit Packets',
         '- GET_HOSTNAME: Get Hostname of Satellite',
+        '- OBC_CPU: Get OBC CPU Usage',
+        '- BEACON_ON [interval]: Enable Health Beacon (default 5s)',
+        '- BEACON_OFF: Disable Health Beacon',
+        '- MORSE <message>: Play Morse Code on Buzzer',
+        '- RESET_ENV: Reset Environmental Sensor MCU',
         '',
         'Radio Configuration:',
         '- get_radio_config: Query current radio configuration',
@@ -322,24 +349,116 @@ function showHelp() {
         '- Clear Buffers: Clear image reception buffers',
         '- Manual Retransmit: Retransmit specific packets (format: filename packet1,packet2,packet3)',
         '',
-        '* Non-Functioning Commands on RFM69'
+        ''
     ];
     
     commands.forEach(cmd => logToTerminal(cmd, 'info'));
 }
 
 /**
- * Open settings modal
+ * Open settings - switches to the Configure tab
  */
 function openSettings() {
-    document.getElementById('settingsModal').classList.add('active');
+    switchTab('configure');
 }
 
 /**
- * Close settings modal
+ * Close settings modal (legacy)
  */
 function closeSettings() {
     document.getElementById('settingsModal').classList.remove('active');
+}
+
+// ============================================================================
+// Astro UXDS: Tab Switching
+// ============================================================================
+
+/**
+ * Switch between Operate and Configure tabs
+ * @param {string} tabName - Tab identifier ('operate' or 'configure')
+ */
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.gsb__tab').forEach(tab => {
+        tab.classList.toggle('gsb__tab--active', tab.dataset.tab === tabName);
+    });
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('tab-content--active', content.id === `tab-${tabName}`);
+    });
+}
+
+// ============================================================================
+// Astro UXDS: UTC Clock
+// ============================================================================
+
+/**
+ * Update the UTC clock display in the GSB
+ */
+function updateAstroClock() {
+    const now = new Date();
+    const timeEl = document.getElementById('clockTime');
+    const dateEl = document.getElementById('clockDate');
+    if (timeEl) {
+        timeEl.textContent = now.toISOString().substring(11, 19);
+    }
+    if (dateEl) {
+        dateEl.textContent = now.toISOString().substring(0, 10);
+    }
+}
+
+// ============================================================================
+// Astro UXDS: Classification Banner
+// ============================================================================
+
+const CLASSIFICATION_MAP = {
+    'unclassified': { text: 'UNCLASSIFIED', cls: 'classification-banner--unclassified' },
+    'cui':          { text: 'CUI', cls: 'classification-banner--cui' },
+    'secret':       { text: 'SECRET', cls: 'classification-banner--secret' },
+    'topsecret':    { text: 'TOP SECRET', cls: 'classification-banner--topsecret' },
+    'topsecretsci': { text: 'TOP SECRET//SCI', cls: 'classification-banner--topsecretsci' }
+};
+
+/**
+ * Update classification banners based on the Configure tab dropdown
+ */
+function updateClassification() {
+    const level = document.getElementById('classificationLevel').value;
+    const info = CLASSIFICATION_MAP[level];
+    if (!info) return;
+
+    const top = document.getElementById('classTopBanner');
+    const bot = document.getElementById('classBotBanner');
+
+    [top, bot].forEach(el => {
+        if (!el) return;
+        // Remove all classification classes
+        Object.values(CLASSIFICATION_MAP).forEach(v => el.classList.remove(v.cls));
+        el.classList.add(info.cls);
+        el.textContent = info.text;
+    });
+}
+
+// ============================================================================
+// Astro UXDS: Monitor Status Helpers
+// ============================================================================
+
+/**
+ * Briefly flash a GSB monitor to indicate activity
+ * @param {string} monitorId - Element ID of the status symbol
+ * @param {string} statusClass - Astro status class (e.g. 'normal', 'caution')
+ * @param {number} duration - Flash duration in ms
+ */
+function flashMonitor(monitorId, statusClass = 'normal', duration = 300) {
+    const el = document.getElementById(monitorId);
+    if (!el) return;
+    el.className = `status-symbol status-symbol--${statusClass}`;
+    setTimeout(() => {
+        // Return to off if not the serial monitor (which tracks connection state)
+        if (monitorId !== 'monSerial') {
+            el.className = 'status-symbol status-symbol--off';
+        }
+    }, duration);
 }
 
 // ============================================================================
@@ -352,13 +471,22 @@ function closeSettings() {
 window.addEventListener('load', () => {
     logToTerminal('WebSerial Ground Station initialized', 'info');
     logToTerminal('Click "Connect to Ground Station" to begin', 'info');
-    
+
     // Initialize radio config
     window.radioConfig = {
         uplink: 'rfm95',
         downlink: 'rfm95'
     };
-    
+
+    // GSB tab switching
+    document.querySelectorAll('.gsb__tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    // Start UTC clock
+    updateAstroClock();
+    setInterval(updateAstroClock, 1000);
+
     // Add tooltips for node address info
     const satelliteAddressInput = document.getElementById('satelliteAddress');
     const downlinkNodeInput = document.getElementById('downlinkNode');

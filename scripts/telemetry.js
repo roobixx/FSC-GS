@@ -289,24 +289,34 @@ function unpackOBCSingleValue(identifier, data) {
  * Packet format: [4-byte ID][230-byte file data string]
  * @param {Uint8Array} data - 234-byte file listing packet
  */
-function unpackOBCFileListing(data) {
-    if (data.length < 234) {
-        logToTerminal(`Invalid OBCL packet size: ${data.length} bytes`, 'warning');
-        return;
-    }
+let obclBuffer = [];
+let obclTimer = null;
 
-    const fileData = new TextDecoder().decode(data.slice(4, 234)).replace(/\0/g, '').trim();
-    
-    if (fileData && !fileData.startsWith('DNE')) {
-        logToTerminal('Onboard Computer File Listing:', 'response');
-        fileData.split('\n').forEach(line => {
-            if (line.trim()) {
-                logToTerminal(`  ${line.trim()}`, 'response');
-            }
+function flushOBCLBuffer() {
+    if (obclBuffer.length === 0) return;
+    const finalData = obclBuffer.join('');
+    const cleaned = finalData.replace(/[\[\]']/g, '');
+    const files = cleaned.split(',').map(f => f.trim()).filter(f => f);
+
+    if (files.length > 0 && !files[0].startsWith('DNE')) {
+        logToTerminal(`OBC File Listing (${files.length} files):`, 'response');
+        files.forEach((file, i) => {
+            logToTerminal(`  ${i + 1}: ${file}`, 'response');
         });
     } else {
         logToTerminal('No files found or directory does not exist', 'response');
     }
+    obclBuffer = [];
+}
+
+function unpackOBCFileListing(data) {
+    if (data.length < 5) return;
+
+    const fileData = new TextDecoder().decode(data.slice(4)).replace(/\0/g, '');
+    obclBuffer.push(fileData);
+
+    if (obclTimer) clearTimeout(obclTimer);
+    obclTimer = setTimeout(flushOBCLBuffer, 1000);
 }
 
 /**
@@ -314,32 +324,32 @@ function unpackOBCFileListing(data) {
  * Packet format: [4-byte ID][230-byte process data string]
  * @param {Uint8Array} data - 234-byte process listing packet
  */
+// Accumulator for multi-packet OBC responses
+let obcpBuffer = [];
+let obcpTimer = null;
+
+function flushOBCPBuffer() {
+    if (obcpBuffer.length === 0) return;
+    const finalData = obcpBuffer.join('');
+    const cleaned = finalData.replace(/[\[\]']/g, '');
+    const processes = cleaned.split(',').map(p => p.trim()).filter(p => p);
+
+    logToTerminal(`OBC Process List (${processes.length} processes):`, 'response');
+    processes.forEach((process, i) => {
+        logToTerminal(`  ${i + 1}: ${process}`, 'response');
+    });
+    obcpBuffer = [];
+}
+
 function unpackOBCProcesses(data) {
-    if (data.length < 234) {
-        logToTerminal(`Invalid OBCP packet size: ${data.length} bytes`, 'warning');
-        return;
-    }
+    if (data.length < 5) return;
 
-    const processData = new TextDecoder().decode(data.slice(4, 234)).replace(/\0/g, '').trim();
-    
-    // Use global array to accumulate process data (defined in main.js)
-    if (typeof obclDataArray !== 'undefined') {
-        obclDataArray.push(processData);
+    const processData = new TextDecoder().decode(data.slice(4)).replace(/\0/g, '');
+    obcpBuffer.push(processData);
 
-        if (processData.includes('END') || processData.length === 0) {
-            const finalData = obclDataArray.join('');
-            const processes = finalData.split(',').filter(p => p.trim());
-            
-            logToTerminal('OBC Process List:', 'response');
-            processes.forEach((process, i) => {
-                if (process.trim() && !process.includes('END')) {
-                    logToTerminal(`  ${i + 1}: ${process.trim()}`, 'response');
-                }
-            });
-            
-            obclDataArray = []; // Clear array
-        }
-    }
+    // Reset flush timer on each chunk — flush 1s after last chunk
+    if (obcpTimer) clearTimeout(obcpTimer);
+    obcpTimer = setTimeout(flushOBCPBuffer, 1000);
 }
 
 // ============================================================================

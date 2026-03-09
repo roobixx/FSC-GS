@@ -157,7 +157,7 @@ function processReceivedData(data) {
             const identifier = new TextDecoder().decode(dataBuffer.slice(0, 4)).replace(/\0/g, '').trim();
 
             // Handle both SEND and RETX packets (RETX are retransmitted chunks)
-            if (identifier === 'SEND' || identifier === 'RETX') {
+            if (identifier === 'SEND' || identifier === 'RETX' || identifier === 'OBCP' || identifier === 'OBCL') {
                 // Find newline delimiter (all packets end with \n from radio.py)
                 let newlinePos = -1;
                 for (let i = 4; i < dataBuffer.length; i++) {
@@ -170,7 +170,11 @@ function processReceivedData(data) {
                 if (newlinePos > 4) {
                     // Complete packet found — process it
                     const packet = dataBuffer.slice(0, newlinePos);
-                    if (typeof processImagePacket === 'function') {
+                    if (identifier === 'OBCP' || identifier === 'OBCL') {
+                        if (typeof unpackCommand === 'function') {
+                            unpackCommand(packet);
+                        }
+                    } else if (typeof processImagePacket === 'function') {
                         processImagePacket(packet);
                     }
 
@@ -194,8 +198,8 @@ function processReceivedData(data) {
             
             // List of known binary packet identifiers
             const binaryIdentifiers = ['GYRO', 'ACCL', 'MAGN', 'GRAV', 'EULR', 'BME2', 'TEMP', 'POLL',
-                                     'OBCR', 'OBCD', 'OBCC', 'OBCL', 'OBCP', 'ADCS', 'EPSS',
-                                     'HOST', 'SOLR', 'RETX', 'XFRC', 'BECN', 'QUAT', 'PHOT'];
+                                     'OBCR', 'OBCD', 'OBCC', 'ADCS', 'EPSS',
+                                     'HOST', 'SOLR', 'XFRC', 'BECN', 'QUAT', 'PHOT'];
             
             if (binaryIdentifiers.includes(identifier)) {
                 const packetSize = getPacketSize(identifier);
